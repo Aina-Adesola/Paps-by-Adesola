@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 
-namespace TemsGroupProject.Models
+namespace PAPPSADMIN.Models
 {
     // Using IdentityUser<int> instead of the default IdentityUser (which uses string/GUID)
     // gives us an int Id that auto-increments starting at 1.
@@ -13,7 +13,7 @@ namespace TemsGroupProject.Models
         public DateTime DateCreated { get; set; } = DateTime.UtcNow;
         public DateTime? LastLogin { get; set; }
 
-        public string? OtpCode { get; set; }
-        public DateTime? OtpExpiresAt { get; set; }
+        // OtpCode and OtpExpiresAt were REMOVED: one-time codes now live in a
+        // short-lived memory cache (see Services/OtpService.cs), not in the database.
     }
 }

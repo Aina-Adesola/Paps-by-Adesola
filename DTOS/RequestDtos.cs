@@ -1,4 +1,4 @@
-﻿namespace TemsGroupProject.DTOs
+﻿namespace PAPPSADMIN.DTOs
 {
     // Only the fields a Requester actually fills in — everything else
     // (dates, status, who created/approved it) is set by the system.

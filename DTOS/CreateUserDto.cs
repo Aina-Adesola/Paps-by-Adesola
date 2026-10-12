@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace TemsGroupProject.DTOs
+namespace PAPPSADMIN.DTOs
 {
     public class CreateUserDto
     {

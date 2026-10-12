@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using TemsGroupProject.Data;
+using PAPPSADMIN.Data;
 
 #nullable disable
 
-namespace TemsGroupProject.Migrations
+namespace PAPPSADMIN.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     partial class ApplicationDbContextModelSnapshot : ModelSnapshot
@@ -155,7 +155,7 @@ namespace TemsGroupProject.Migrations
                     b.ToTable("UserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("TemsGroupProject.Models.ApplicationUser", b =>
+            modelBuilder.Entity("PAPPSADMIN.Models.ApplicationUser", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -207,12 +207,6 @@ namespace TemsGroupProject.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
-                    b.Property<string>("OtpCode")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("OtpExpiresAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
 
@@ -253,7 +247,7 @@ namespace TemsGroupProject.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
-            modelBuilder.Entity("TemsGroupProject.Models.AuditLog", b =>
+            modelBuilder.Entity("PAPPSADMIN.Models.AuditLog", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -286,7 +280,7 @@ namespace TemsGroupProject.Migrations
                     b.ToTable("AuditLogs", (string)null);
                 });
 
-            modelBuilder.Entity("TemsGroupProject.Models.FeeRequest", b =>
+            modelBuilder.Entity("PAPPSADMIN.Models.FeeRequest", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -339,7 +333,7 @@ namespace TemsGroupProject.Migrations
                     b.ToTable("Requests", (string)null);
                 });
 
-            modelBuilder.Entity("TemsGroupProject.Models.UserSession", b =>
+            modelBuilder.Entity("PAPPSADMIN.Models.UserSession", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -376,7 +370,7 @@ namespace TemsGroupProject.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<int>", b =>
                 {
-                    b.HasOne("TemsGroupProject.Models.ApplicationUser", null)
+                    b.HasOne("PAPPSADMIN.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -385,7 +379,7 @@ namespace TemsGroupProject.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<int>", b =>
                 {
-                    b.HasOne("TemsGroupProject.Models.ApplicationUser", null)
+                    b.HasOne("PAPPSADMIN.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -400,7 +394,7 @@ namespace TemsGroupProject.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("TemsGroupProject.Models.ApplicationUser", null)
+                    b.HasOne("PAPPSADMIN.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -409,7 +403,7 @@ namespace TemsGroupProject.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<int>", b =>
                 {
-                    b.HasOne("TemsGroupProject.Models.ApplicationUser", null)
+                    b.HasOne("PAPPSADMIN.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)

@@ -1,4 +1,4 @@
-﻿namespace TemsGroupProject.Models
+﻿namespace PAPPSADMIN.Models
 {
     // One row per login. LogoutTime stays null until the user calls /api/auth/logout,
     // or (if they never do) is treated as "still active" by the Audit view.

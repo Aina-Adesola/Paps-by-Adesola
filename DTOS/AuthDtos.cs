@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace TemsGroupProject.DTOs
+namespace PAPPSADMIN.DTOs
 {
     public class LoginDto
     {
@@ -38,7 +38,7 @@ public class VerifyOtpDto
 }
 
 
-namespace TemsGroupProject.DTOS
+namespace PAPPSADMIN.DTOS
 {
     public class CreateUserDto
     {

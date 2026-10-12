@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using TemsGroupProject.Models;
+using PAPPSADMIN.Models;
 
-namespace TemsGroupProject.Data
+namespace PAPPSADMIN.Data
 {
     // IdentityDbContext<TUser, TRole, TKey> with TKey = int gives every Identity table
     // (Users, Roles, UserRoles, etc.) an int primary key instead of the default GUID.

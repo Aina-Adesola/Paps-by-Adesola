@@ -1,9 +1,9 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Mail;
 
-namespace TemsGroupProject.Services
+namespace PAPPSADMIN.Services
 {
-    public class EmailService
+    public class EmailService : IEmailService
     {
         private readonly IConfiguration _config;
         private readonly ILogger<EmailService> _logger;

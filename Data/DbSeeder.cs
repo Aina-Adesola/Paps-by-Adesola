@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
-using TemsGroupProject.Models;
+using PAPPSADMIN.Models;
 
-namespace TemsGroupProject.Data
+namespace PAPPSADMIN.Data
 {
     public static class DbSeeder
     {

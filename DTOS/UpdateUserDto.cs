@@ -1,4 +1,4 @@
-﻿namespace TemsGroupProject.DTOs
+﻿namespace PAPPSADMIN.DTOs
 {
     // Every field is optional — SGC can change just the one thing they need to
     // (e.g. only the role) without having to resend everything else.

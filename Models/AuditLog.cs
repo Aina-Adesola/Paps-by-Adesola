@@ -1,4 +1,4 @@
-﻿namespace TemsGroupProject.Models
+﻿namespace PAPPSADMIN.Models
 {
     // One row per notable action taken in the system (login, logout, create user,
     // disable user, edit user, create request, approve/deny request). The Audit

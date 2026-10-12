@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace TemsGroupProject.Migrations
+namespace PAPPSADMIN.Migrations
 {
     /// <inheritdoc />
     public partial class AddOtpFieldsToUser : Migration

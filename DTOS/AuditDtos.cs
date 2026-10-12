@@ -1,4 +1,4 @@
-﻿namespace TemsGroupProject.DTOs
+﻿namespace PAPPSADMIN.DTOs
 {
     public class AuditActionDto
     {

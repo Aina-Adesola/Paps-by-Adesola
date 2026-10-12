@@ -1,19 +1,19 @@
-﻿using Microsoft.EntityFrameworkCore;
-using TemsGroupProject.Data;
-using TemsGroupProject.Models;
+using Microsoft.EntityFrameworkCore;
+using PAPPSADMIN.Data;
+using PAPPSADMIN.DTOs;
+using PAPPSADMIN.Models;
 
-namespace TemsGroupProject.Services
+namespace PAPPSADMIN.Services
 {
-    // Central place every controller calls into to record "this happened."
-    // Keeping it in one service means the logging logic lives in one spot
-    // instead of being copy-pasted into every controller.
-    public class AuditService
+    public class AuditService : IAuditService
     {
         private readonly ApplicationDbContext _context;
+        private readonly ICurrentUserService _currentUser;
 
-        public AuditService(ApplicationDbContext context)
+        public AuditService(ApplicationDbContext context, ICurrentUserService currentUser)
         {
             _context = context;
+            _currentUser = currentUser;
         }
 
         public async Task<int> StartSessionAsync(int userId, string userName)
@@ -51,6 +51,43 @@ namespace TemsGroupProject.Services
                 Timestamp = DateTime.UtcNow
             });
             await _context.SaveChangesAsync();
+        }
+
+        public Task LogCurrentUserAsync(string action, string? details = null)
+            => LogAsync(_currentUser.SessionId, _currentUser.UserId, _currentUser.DisplayName, action, details);
+
+        // Moved here from AuditController.
+        public async Task<ApiResponse<List<SessionAuditDto>>> GetSessionsAsync(DateTime? fromDate, DateTime? toDate)
+        {
+            var sessionQuery = _context.UserSessions.AsQueryable();
+            if (fromDate.HasValue) sessionQuery = sessionQuery.Where(s => s.LoginTime >= fromDate.Value);
+            if (toDate.HasValue) sessionQuery = sessionQuery.Where(s => s.LoginTime <= toDate.Value);
+
+            var sessions = await sessionQuery.OrderByDescending(s => s.LoginTime).ToListAsync();
+            var sessionIds = sessions.Select(s => s.Id).ToList();
+
+            var actions = await _context.AuditLogs
+                .Where(a => a.SessionId != null && sessionIds.Contains(a.SessionId.Value))
+                .OrderBy(a => a.Timestamp)
+                .ToListAsync();
+
+            var actionsBySession = actions.ToLookup(a => a.SessionId!.Value);
+
+            var result = sessions.Select(s => new SessionAuditDto
+            {
+                SessionId = s.Id,
+                UserId = s.UserId,
+                UserName = s.UserName,
+                LoginTime = s.LoginTime,
+                LogoutTime = s.LogoutTime,
+                DurationMinutes = Math.Round(((s.LogoutTime ?? DateTime.UtcNow) - s.LoginTime).TotalMinutes, 1),
+                StillActive = s.LogoutTime is null,
+                Actions = actionsBySession[s.Id]
+                    .Select(a => new AuditActionDto { Action = a.Action, Details = a.Details, Timestamp = a.Timestamp })
+                    .ToList()
+            }).ToList();
+
+            return ApiResponse.Ok(result, "Audit sessions retrieved successfully.");
         }
     }
 }

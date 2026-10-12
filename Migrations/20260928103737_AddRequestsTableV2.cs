@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace TemsGroupProject.Migrations
+namespace PAPPSADMIN.Migrations
 {
     /// <inheritdoc />
     public partial class AddRequestsTableV2 : Migration
