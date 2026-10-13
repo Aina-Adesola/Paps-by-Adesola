@@ -56,7 +56,7 @@ namespace PAPPSADMIN.Services
         public Task LogCurrentUserAsync(string action, string? details = null)
             => LogAsync(_currentUser.SessionId, _currentUser.UserId, _currentUser.DisplayName, action, details);
 
-        // Moved here from AuditController.
+        // Grouped by login session (existing view).
         public async Task<ApiResponse<List<SessionAuditDto>>> GetSessionsAsync(DateTime? fromDate, DateTime? toDate)
         {
             var sessionQuery = _context.UserSessions.AsQueryable();
@@ -88,6 +88,36 @@ namespace PAPPSADMIN.Services
             }).ToList();
 
             return ApiResponse.Ok(result, "Audit sessions retrieved successfully.");
+        }
+
+        // NEW: one flat list of everything that happened, newest first, as readable sentences.
+        public async Task<ApiResponse<List<AuditLogDto>>> GetLogsAsync(DateTime? fromDate, DateTime? toDate)
+        {
+            var query = _context.AuditLogs.AsQueryable();
+            if (fromDate.HasValue) query = query.Where(a => a.Timestamp >= fromDate.Value);
+            if (toDate.HasValue) query = query.Where(a => a.Timestamp <= toDate.Value);
+
+            var logs = await query
+                .OrderByDescending(a => a.Timestamp)
+                .ThenByDescending(a => a.Id)
+                .ToListAsync();
+
+            var result = logs.Select(a => new AuditLogDto
+            {
+                Id = a.Id,
+                SessionId = a.SessionId,
+                UserId = a.UserId,
+                UserName = a.UserName,
+                Action = a.Action,
+                Details = a.Details,
+                // e.g. "Paul changed Peter Obi's role from Audit to Requester"
+                Description = string.IsNullOrWhiteSpace(a.Details)
+                    ? $"{a.UserName}: {a.Action}"
+                    : $"{a.UserName} {a.Details}",
+                Timestamp = a.Timestamp
+            }).ToList();
+
+            return ApiResponse.Ok(result, "Audit logs retrieved successfully.");
         }
     }
 }

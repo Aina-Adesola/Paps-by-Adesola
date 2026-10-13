@@ -22,9 +22,15 @@ namespace PAPPSADMIN.Services
             _logger = logger;
         }
 
+        // "Peter Obi", or the email if the user has no name saved.
+        private static string NameOf(ApplicationUser u)
+        {
+            var full = $"{u.FirstName} {u.LastName}".Trim();
+            return !string.IsNullOrWhiteSpace(full) ? full : (u.Email ?? $"User {u.Id}");
+        }
+
         public async Task<ApiResponse<UserResponseDto>> CreateUserAsync(CreateUserDto dto)
         {
-            // Expected problems: check first, answer politely. No exceptions needed.
             if (!Roles.AssignableRoles.Contains(dto.Role, StringComparer.OrdinalIgnoreCase))
                 return ApiResponse.Fail<UserResponseDto>(
                     $"Role must be one of: {string.Join(", ", Roles.AssignableRoles)}", 400);
@@ -52,8 +58,6 @@ namespace PAPPSADMIN.Services
             }
             catch (DbUpdateException ex)
             {
-                // Unexpected problem we can still explain (e.g. two admins creating the
-                // same Staff ID at the same moment, so the unique index rejects one).
                 _logger.LogWarning(ex, "Database rejected new user {Email}", dto.Email);
                 return ApiResponse.Fail<UserResponseDto>(
                     "The user could not be saved. The email or Staff ID may already be in use.", 409);
@@ -66,7 +70,6 @@ namespace PAPPSADMIN.Services
             var roleResult = await _userManager.AddToRoleAsync(user, dto.Role);
             if (!roleResult.Succeeded)
             {
-                // Don't leave a half-created user behind (an account that has no role).
                 await _userManager.DeleteAsync(user);
                 return ApiResponse.Fail<UserResponseDto>(
                     "The role could not be assigned, so the new user was not created.", 500,
@@ -74,7 +77,8 @@ namespace PAPPSADMIN.Services
             }
 
             await _auditService.LogCurrentUserAsync(
-                "CreatedUser", $"Created user {user.Id} ({user.Email}) with role {dto.Role}");
+                "CreatedUser",
+                $"created the user {NameOf(user)} (Staff ID {user.StaffId}, {user.Email}) with the role {dto.Role}");
 
             return ApiResponse.Ok(user.ToDto(new[] { dto.Role }), "User created successfully.", 201);
         }
@@ -113,16 +117,32 @@ namespace PAPPSADMIN.Services
             if (user is null)
                 return ApiResponse.Fail<UserResponseDto>("User not found.", 404);
 
-            // Validate the role BEFORE saving anything, so a bad role can't leave
-            // the profile half-updated.
             if (!string.IsNullOrWhiteSpace(dto.Role) &&
                 !Roles.AssignableRoles.Contains(dto.Role, StringComparer.OrdinalIgnoreCase))
                 return ApiResponse.Fail<UserResponseDto>(
                     $"Role must be one of: {string.Join(", ", Roles.AssignableRoles)}", 400);
 
-            if (!string.IsNullOrWhiteSpace(dto.FirstName)) user.FirstName = dto.FirstName;
-            if (!string.IsNullOrWhiteSpace(dto.LastName)) user.LastName = dto.LastName;
-            if (!string.IsNullOrWhiteSpace(dto.StaffId)) user.StaffId = dto.StaffId;
+            // The name as it was BEFORE this edit, so the audit reads naturally.
+            var nameBefore = NameOf(user);
+            var changes = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(dto.FirstName) && dto.FirstName != user.FirstName)
+            {
+                changes.Add($"first name from '{user.FirstName}' to '{dto.FirstName}'");
+                user.FirstName = dto.FirstName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.LastName) && dto.LastName != user.LastName)
+            {
+                changes.Add($"last name from '{user.LastName}' to '{dto.LastName}'");
+                user.LastName = dto.LastName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.StaffId) && dto.StaffId != user.StaffId)
+            {
+                changes.Add($"Staff ID from '{user.StaffId}' to '{dto.StaffId}'");
+                user.StaffId = dto.StaffId;
+            }
 
             if (!string.IsNullOrWhiteSpace(dto.Email) &&
                 !string.Equals(dto.Email, user.Email, StringComparison.OrdinalIgnoreCase))
@@ -131,23 +151,63 @@ namespace PAPPSADMIN.Services
                 if (emailTaken is not null && emailTaken.Id != user.Id)
                     return ApiResponse.Fail<UserResponseDto>("Another user already has this email.", 409);
 
+                changes.Add($"email from '{user.Email}' to '{dto.Email}'");
                 user.Email = dto.Email;
                 user.UserName = dto.Email; // login uses the email as the username
             }
 
-            var updateResult = await _userManager.UpdateAsync(user);
-            if (!updateResult.Succeeded)
-                return ApiResponse.Fail<UserResponseDto>(
-                    "Could not update the user.", 400, updateResult.Errors.Select(e => e.Description));
-
-            if (!string.IsNullOrWhiteSpace(dto.Role))
+            if (changes.Count > 0)
             {
-                var currentRoles = await _userManager.GetRolesAsync(user);
-                await _userManager.RemoveFromRolesAsync(user, currentRoles);
-                await _userManager.AddToRoleAsync(user, dto.Role);
+                var updateResult = await _userManager.UpdateAsync(user);
+                if (!updateResult.Succeeded)
+                    return ApiResponse.Fail<UserResponseDto>(
+                        "Could not update the user.", 400, updateResult.Errors.Select(e => e.Description));
             }
 
-            await _auditService.LogCurrentUserAsync("EditedUser", $"Edited user {user.Id} ({user.Email})");
+            // ---- role change ----
+            string? roleChangeDetails = null;
+            if (!string.IsNullOrWhiteSpace(dto.Role))
+            {
+                // Use the official spelling of the role (e.g. "Requester"), whatever case was typed.
+                var newRole = Roles.AssignableRoles.First(r => string.Equals(r, dto.Role, StringComparison.OrdinalIgnoreCase));
+                var currentRoles = await _userManager.GetRolesAsync(user);
+                var alreadyHasIt = currentRoles.Any(r => string.Equals(r, newRole, StringComparison.OrdinalIgnoreCase));
+
+                if (!alreadyHasIt || currentRoles.Count > 1)
+                {
+                    var oldRoleText = currentRoles.Count > 0 ? string.Join(", ", currentRoles) : "no role";
+
+                    // Add the new role FIRST, so a failure can never leave the user without a role.
+                    if (!alreadyHasIt)
+                    {
+                        var addResult = await _userManager.AddToRoleAsync(user, newRole);
+                        if (!addResult.Succeeded)
+                            return ApiResponse.Fail<UserResponseDto>(
+                                "Could not assign the new role.", 500, addResult.Errors.Select(e => e.Description));
+                    }
+
+                    var toRemove = currentRoles
+                        .Where(r => !string.Equals(r, newRole, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    if (toRemove.Count > 0)
+                    {
+                        var removeResult = await _userManager.RemoveFromRolesAsync(user, toRemove);
+                        if (!removeResult.Succeeded)
+                            return ApiResponse.Fail<UserResponseDto>(
+                                "Could not remove the old role.", 500, removeResult.Errors.Select(e => e.Description));
+                    }
+
+                    roleChangeDetails = $"changed {nameBefore}'s role from {oldRoleText} to {newRole}";
+                }
+            }
+
+            // ---- audit: only log what actually changed ----
+            if (changes.Count > 0)
+                await _auditService.LogCurrentUserAsync(
+                    "EditedUser", $"edited {nameBefore}: changed {string.Join("; ", changes)}");
+
+            if (roleChangeDetails is not null)
+                await _auditService.LogCurrentUserAsync("ChangedUserRole", roleChangeDetails);
 
             var roles = await _userManager.GetRolesAsync(user);
             return ApiResponse.Ok(user.ToDto(roles), "User updated successfully.");
@@ -165,7 +225,8 @@ namespace PAPPSADMIN.Services
                 return ApiResponse.Fail(
                     "Could not disable the user.", 400, lockoutResult.Errors.Select(e => e.Description));
 
-            await _auditService.LogCurrentUserAsync("DisabledUser", $"Disabled user {id}");
+            await _auditService.LogCurrentUserAsync(
+                "DisabledUser", $"disabled the account of {NameOf(user)} (Staff ID {user.StaffId})");
             return ApiResponse.Ok($"User {id} has been disabled.");
         }
 
@@ -180,7 +241,8 @@ namespace PAPPSADMIN.Services
                 return ApiResponse.Fail(
                     "Could not re-enable the user.", 400, result.Errors.Select(e => e.Description));
 
-            await _auditService.LogCurrentUserAsync("EnabledUser", $"Enabled user {id}");
+            await _auditService.LogCurrentUserAsync(
+                "EnabledUser", $"re-enabled the account of {NameOf(user)} (Staff ID {user.StaffId})");
             return ApiResponse.Ok($"User {id} has been re-enabled.");
         }
     }

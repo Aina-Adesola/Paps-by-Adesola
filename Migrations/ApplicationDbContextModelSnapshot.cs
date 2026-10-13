@@ -333,6 +333,48 @@ namespace PAPPSADMIN.Migrations
                     b.ToTable("Requests", (string)null);
                 });
 
+            modelBuilder.Entity("PAPPSADMIN.Models.PapsRate", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ApprovedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FeeRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<double>("PapsMaximumFee")
+                        .HasColumnType("float");
+
+                    b.Property<double>("PapsMinimumFee")
+                        .HasColumnType("float");
+
+                    b.Property<double>("PapsPercentage")
+                        .HasColumnType("float");
+
+                    b.Property<double>("WemaMaximumFee")
+                        .HasColumnType("float");
+
+                    b.Property<double>("WemaMinimumFee")
+                        .HasColumnType("float");
+
+                    b.Property<double>("WemaPercentage")
+                        .HasColumnType("float");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PapsRates", (string)null);
+                });
+
             modelBuilder.Entity("PAPPSADMIN.Models.UserSession", b =>
                 {
                     b.Property<int>("Id")

@@ -34,6 +34,7 @@ builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddScoped<IRequestService, RequestService>();
+builder.Services.AddScoped<IPapsRateService, PapsRateService>();
 
 // --- Global exception handling (the safety net) ---
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

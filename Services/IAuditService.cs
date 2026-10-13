@@ -12,5 +12,8 @@ namespace PAPPSADMIN.Services
         Task LogCurrentUserAsync(string action, string? details = null);
 
         Task<ApiResponse<List<SessionAuditDto>>> GetSessionsAsync(DateTime? fromDate, DateTime? toDate);
+
+        // Flat, readable list of every logged action.
+        Task<ApiResponse<List<AuditLogDto>>> GetLogsAsync(DateTime? fromDate, DateTime? toDate);
     }
 }

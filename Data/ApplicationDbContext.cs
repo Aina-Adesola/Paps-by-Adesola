@@ -10,6 +10,7 @@ namespace PAPPSADMIN.Data
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>
     {
         public DbSet<FeeRequest> FeeRequests { get; set; }
+        public DbSet<PapsRate> PapsRates { get; set; }
 
         // <-- ADDED: Phase Two auditing tables
         public DbSet<AuditLog> AuditLogs { get; set; }
@@ -33,6 +34,11 @@ namespace PAPPSADMIN.Data
             });
 
             builder.Entity<FeeRequest>().ToTable("Requests");
+            builder.Entity<PapsRate>(e =>
+            {
+                e.ToTable("PapsRates");
+                e.Property(r => r.Id).ValueGeneratedNever();
+            });
 
             // <-- ADDED: map the two new auditing entities to explicit table names
             builder.Entity<AuditLog>().ToTable("AuditLogs");

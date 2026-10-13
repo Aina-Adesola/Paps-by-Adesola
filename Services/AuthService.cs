@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Identity;
 using PAPPSADMIN.DTOs;
-using PAPPSADMIN.Services;
-using PAPPSADMIN.DTOs;
 using PAPPSADMIN.Mappers;
 using PAPPSADMIN.Models;
 
@@ -13,7 +11,7 @@ namespace PAPPSADMIN.Services
         private readonly IEmailService _emailService;
         private readonly IAuditService _auditService;
         private readonly ITokenService _tokenService;
-        private readonly IOtpService _otpService;          // NEW: replaces the OTP columns in the database
+        private readonly IOtpService _otpService;
         private readonly ICurrentUserService _currentUser;
 
         public AuthService(
@@ -32,6 +30,11 @@ namespace PAPPSADMIN.Services
             _currentUser = currentUser;
         }
 
+        // Failed attempts have no session yet, so the session id is null.
+        // Attempts with an unknown email are not logged (there is no user to attach them to).
+        private Task LogFailureAsync(ApplicationUser user, string action, string details)
+            => _auditService.LogAsync(null, user.Id, GetDisplayName(user), action, details);
+
         public async Task<ApiResponse<object>> LoginAsync(LoginDto dto)
         {
             var user = await _userManager.FindByEmailAsync(dto.Email);
@@ -39,18 +42,24 @@ namespace PAPPSADMIN.Services
                 return ApiResponse.Fail("Invalid email or password.", 401);
 
             if (await _userManager.IsLockedOutAsync(user))
+            {
+                await LogFailureAsync(user, "LoginBlocked", "tried to log in but the account is disabled");
                 return ApiResponse.Fail("This account has been disabled.", 401);
+            }
 
             if (!await _userManager.CheckPasswordAsync(user, dto.Password))
+            {
+                await LogFailureAsync(user, "LoginFailed", "failed to log in: wrong password");
                 return ApiResponse.Fail("Invalid email or password.", 401);
+            }
 
-            // The code is created and kept in the cache. Nothing is saved to the database now.
             var otp = _otpService.Generate(user.Id);
 
             var sent = await _emailService.SendOtpEmailAsync(user.Email!, otp);
             if (!sent)
             {
-                _otpService.Remove(user.Id); // no point keeping a code the user never received
+                _otpService.Remove(user.Id);
+                await LogFailureAsync(user, "OtpSendFailed", "entered the right password but the verification code could not be sent");
                 return ApiResponse.Fail(
                     "We couldn't send your verification code right now. Please try again in a moment.", 503);
             }
@@ -65,21 +74,26 @@ namespace PAPPSADMIN.Services
             if (user is null)
                 return ApiResponse.Fail<LoginResponseDto>("Invalid email or code.", 401);
 
-            // An account disabled between step 1 and step 2 must not get in.
             if (await _userManager.IsLockedOutAsync(user))
+            {
+                await LogFailureAsync(user, "LoginBlocked", "tried to finish logging in but the account is disabled");
                 return ApiResponse.Fail<LoginResponseDto>("This account has been disabled.", 401);
+            }
 
             switch (_otpService.Verify(user.Id, dto.Otp))
             {
                 case OtpResult.Expired:
+                    await LogFailureAsync(user, "OtpFailed", "used a verification code that had expired or was not active");
                     return ApiResponse.Fail<LoginResponseDto>(
                         "No active code, or it has expired. Please log in again to request a new one.", 400);
 
                 case OtpResult.TooManyAttempts:
+                    await LogFailureAsync(user, "OtpLockedOut", "entered too many wrong verification codes; the code was cancelled");
                     return ApiResponse.Fail<LoginResponseDto>(
                         "Too many wrong codes. Please log in again to request a new one.", 429);
 
                 case OtpResult.Invalid:
+                    await LogFailureAsync(user, "OtpFailed", "entered a wrong verification code");
                     return ApiResponse.Fail<LoginResponseDto>("Invalid email or code.", 401);
             }
 
@@ -91,7 +105,7 @@ namespace PAPPSADMIN.Services
             var displayName = GetDisplayName(user);
 
             var sessionId = await _auditService.StartSessionAsync(user.Id, displayName);
-            await _auditService.LogAsync(sessionId, user.Id, displayName, "Login");
+            await _auditService.LogAsync(sessionId, user.Id, displayName, "Login", "logged in");
 
             var token = _tokenService.GenerateToken(user, roles, sessionId);
 
@@ -105,7 +119,7 @@ namespace PAPPSADMIN.Services
             {
                 await _auditService.EndSessionAsync(sessionId);
                 await _auditService.LogAsync(
-                    sessionId, _currentUser.UserId, _currentUser.DisplayName, "Logout");
+                    sessionId, _currentUser.UserId, _currentUser.DisplayName, "Logout", "logged out");
             }
 
             return ApiResponse.Ok("Logged out.");

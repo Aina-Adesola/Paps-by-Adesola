@@ -41,7 +41,11 @@ namespace PAPPSADMIN.Services
             _context.FeeRequests.Add(request);
             await _context.SaveChangesAsync();
 
-            await _auditService.LogCurrentUserAsync("CreatedRequest", $"Created request {request.Id}");
+            await _auditService.LogCurrentUserAsync(
+                "CreatedRequest",
+                $"created fee request {request.Id} " +
+                $"(WEMA: {request.WemaPercentage}%, min {request.WemaMinimumFee}, max {request.WemaMaximumFee}; " +
+                $"PAPS: {request.PapsPercentage}%, min {request.PapsMinimumFee}, max {request.PapsMaximumFee})");
 
             return ApiResponse.Ok(request.ToDto(), "Request created and is waiting for approval.", 201);
         }
@@ -121,13 +125,67 @@ namespace PAPPSADMIN.Services
             request.ApprovedBy = _currentUser.DisplayName;
             request.ApprovedByUserId = _currentUser.UserId;
 
-            await _context.SaveChangesAsync();
-
             var approved = newStatus == RequestStatus.Approved;
-            await _auditService.LogCurrentUserAsync(approved ? "ApprovedRequest" : "DeniedRequest", $"Request {id}");
+            var verb = approved ? "approved" : "denied";
 
-            return ApiResponse.Ok(request.ToDto(), $"Request {id} has been {(approved ? "approved" : "denied")}.");
+            // The rates table holds exactly ONE row. On approval we overwrite that row with the
+            // request's values (creating it only the very first time). Denials never touch it.
+            // The rate is changed in the SAME context as the status, so the single SaveChanges
+            // below saves both or neither.
+            PapsRate? rate = null;
+            string? previousRate = null;
+            if (approved)
+            {
+                rate = await _context.PapsRates.FirstOrDefaultAsync(r => r.Id == PapsRate.CurrentRateId);
+                if (rate is null)
+                {
+                    rate = new PapsRate { Id = PapsRate.CurrentRateId };
+                    _context.PapsRates.Add(rate);
+                }
+                else
+                {
+                    previousRate = DescribeRate(rate); // kept for the audit log
+                }
+
+                rate.FeeRequestId = request.Id;
+                rate.WemaPercentage = request.WemaPercentage;
+                rate.WemaMinimumFee = request.WemaMinimumFee;
+                rate.WemaMaximumFee = request.WemaMaximumFee;
+                rate.PapsPercentage = request.PapsPercentage;
+                rate.PapsMinimumFee = request.PapsMinimumFee;
+                rate.PapsMaximumFee = request.PapsMaximumFee;
+                rate.DateCreated = DateTime.UtcNow;
+                rate.CreatedBy = request.CreatedBy;
+                rate.ApprovedBy = request.ApprovedBy ?? _currentUser.DisplayName;
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException) when (approved)
+            {
+                // Only possible if two approvals tried to create the very first rate at the same instant.
+                return ApiResponse.Fail<FeeRequestResponseDto>(
+                    "Another approval was being processed at the same moment. Please try again.", 409);
+            }
+
+            // The audit log is the history of rates, so it records what was replaced.
+            var rateNote = rate is null ? ""
+                : previousRate is null
+                    ? " and set it as the first Paps rate"
+                    : $" and replaced the Paps rate (previous values: {previousRate})";
+            await _auditService.LogCurrentUserAsync(
+                approved ? "ApprovedRequest" : "DeniedRequest",
+                $"{verb} fee request {id}, which was created by {request.CreatedBy} " +
+                $"on {request.DateCreated:yyyy-MM-dd HH:mm} UTC{rateNote}");
+
+            return ApiResponse.Ok(request.ToDto(), $"Request {id} has been {verb}.");
         }
+
+        private static string DescribeRate(PapsRate r) =>
+            $"WEMA {r.WemaPercentage}% (min {r.WemaMinimumFee}, max {r.WemaMaximumFee}); " +
+            $"PAPS {r.PapsPercentage}% (min {r.PapsMinimumFee}, max {r.PapsMaximumFee})";
 
         private static IQueryable<FeeRequest> ApplyStatusFilter(IQueryable<FeeRequest> query, string? status)
         {

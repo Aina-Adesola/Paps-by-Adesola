@@ -18,8 +18,15 @@ namespace PAPPSADMIN.Controllers
         }
 
         // GET api/audit/sessions?fromDate=...&toDate=...
+        // Grouped by login session.
         [HttpGet("sessions")]
         public async Task<IActionResult> GetSessions([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
             => FromResponse(await _auditService.GetSessionsAsync(fromDate, toDate));
+
+        // GET api/audit/logs?fromDate=...&toDate=...
+        // Every action in one list, newest first, written as readable sentences.
+        [HttpGet("logs")]
+        public async Task<IActionResult> GetLogs([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+            => FromResponse(await _auditService.GetLogsAsync(fromDate, toDate));
     }
 }
